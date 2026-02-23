@@ -176,6 +176,14 @@ function buildHtml({
       storeBtn.style.display = "block";
       webBtn.style.display   = "block";
       status.textContent     = "App not installed? Download it from the store.";
+
+      // iOS: auto-redirect to App Store after 2 more seconds
+      if (isIOS) {
+        status.textContent = "Redirecting to App Store in 2 seconds...";
+        setTimeout(() => {
+          if (!appOpened) window.location.href = storeUrl;
+        }, 2000);
+      }
     } else {
       msg.textContent = "App opened successfully!";
       spinner.style.display = "none";

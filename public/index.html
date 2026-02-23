@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deep Link Server</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 720px; margin: 60px auto; padding: 0 24px;
+      color: #1d1d1f; background: #f5f5f7;
+    }
+    h1   { font-size: 28px; margin-bottom: 8px; }
+    p    { color: #6e6e73; line-height: 1.6; }
+    pre  {
+      background: #1d1d1f; color: #f5f5f7;
+      border-radius: 10px; padding: 16px 20px;
+      font-size: 14px; overflow-x: auto; margin: 16px 0;
+    }
+    h2   { margin-top: 36px; font-size: 18px; }
+    a    { color: #007aff; }
+  </style>
+</head>
+<body>
+  <h1>🔗 Deep Link Server</h1>
+  <p>White-label deep link routing for multiple apps.</p>
+
+  <h2>Endpoints</h2>
+
+  <h3>Redirect via query params</h3>
+  <pre>GET /redirect?app=app1&amp;path=/product/123&amp;ref=email</pre>
+
+  <h3>Redirect via clean URL</h3>
+  <pre>GET /link/app1/product/123?ref=email</pre>
+
+  <h3>Health check</h3>
+  <pre>GET /health</pre>
+
+  <h2>Well-Known Files</h2>
+  <p>
+    <a href="/.well-known/apple-app-site-association">apple-app-site-association</a><br/>
+    <a href="/.well-known/assetlinks.json">assetlinks.json</a>
+  </p>
+</body>
+</html>

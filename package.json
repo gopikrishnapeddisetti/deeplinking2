@@ -1,0 +1,17 @@
+{
+  "name": "deeplink-server",
+  "version": "1.0.0",
+  "description": "White-label deep link server for Vercel",
+  "main": "api/redirect.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vercel": "^33.0.0"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}

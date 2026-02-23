@@ -1,0 +1,22 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.zuddl.quantumleap2026",
+      "sha256_cert_fingerprints": [
+        "REPLACE_WITH_SHA256_FROM_PLAY_CONSOLE"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.zuddl.portal",
+      "sha256_cert_fingerprints": [
+        "REPLACE_WITH_SHA256_FROM_PLAY_CONSOLE"
+      ]
+    }
+  }
+]

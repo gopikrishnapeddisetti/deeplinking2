@@ -157,17 +157,24 @@ function buildHtml({
   storeBtn.href = storeUrl;
 
   let appOpened = false;
+  let visibilityDelay = null;
 
-  // If the page goes to background, the app opened successfully
+  // Use visibilitychange ONLY — blur is unreliable on iOS (false positives)
+  // Add a small delay to avoid false positives from Safari's scheme-not-found flicker
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) appOpened = true;
+    if (document.hidden) {
+      // Wait 300ms — if page stays hidden, app really opened
+      visibilityDelay = setTimeout(() => { appOpened = true; }, 300);
+    } else {
+      // Page came back quickly = false positive, cancel
+      if (visibilityDelay) clearTimeout(visibilityDelay);
+    }
   });
-  window.addEventListener("blur", () => { appOpened = true; });
 
   // Attempt to open the app immediately
   window.location.href = deepLink;
 
-  // After 2.5s, if app didn't open, show fallback options
+  // After 3s, check if app opened
   setTimeout(() => {
     if (!appOpened) {
       spinner.style.display = "none";
@@ -175,20 +182,21 @@ function buildHtml({
       openBtn.textContent = "Try Opening App";
       storeBtn.style.display = "block";
       webBtn.style.display   = "block";
-      status.textContent     = "App not installed? Download it from the store.";
 
-      // iOS: auto-redirect to App Store after 2 more seconds
+      // iOS: auto-redirect to App Store
       if (isIOS) {
         status.textContent = "Redirecting to App Store in 2 seconds...";
         setTimeout(() => {
           if (!appOpened) window.location.href = storeUrl;
         }, 2000);
+      } else {
+        status.textContent = "App not installed? Download it from the store.";
       }
     } else {
       msg.textContent = "App opened successfully!";
       spinner.style.display = "none";
     }
-  }, 2500);
+  }, 3000);
 </script>
 </body>
 </html>`;

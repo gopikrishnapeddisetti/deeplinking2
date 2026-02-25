@@ -1,55 +1,74 @@
 /**
  * White Label App Configuration
+ *
+ * Supports two URL formats:
+ *   /link/zuddl/game/eventId/xxx          → short key
+ *   /link/com.zuddl.portal/game/eventId/xxx → package name key
  */
 const apps = {
 
-  /**
-   * Quantum Leap 2026
-   * iOS:     https://apps.apple.com/us/app/quantum-leap-2026/id6758663541
-   * Android: https://play.google.com/store/apps/details?id=com.zuddl.quantumleap2026
-   *
-   * TODO: Replace TEAMID_QL with your Apple Team ID (10-char string from developer.apple.com)
-   * TODO: Replace sha256 with value from Play Console → Setup → App Integrity
-   * TODO: Set scheme to whatever is registered in your app (e.g. "quantumleap://")
-   * TODO: Set fallback to your web URL or keep store URL as fallback
-   */
-  quantumleap: {
+  // ── Quantum Leap 2026 ──────────────────────────────────────────────────────
+
+  // Short key  → /link/quantumleap/game/eventId/xxx
+  "quantumleap": {
     name: "Quantum Leap 2026",
+    fallback: "https://play.google.com/store/apps/details?id=com.zuddl.quantumleap2026",
     ios: {
-      appId: "TEAMID_QL.com.zuddl.quantumleap2026",   // ← replace TEAMID_QL
-      scheme: "quantumleap2026://",                     // ← confirm with your iOS dev
+      appId:    "TEAMID_QL.com.zuddl.quantumleap2026",
+      scheme:   "quantumapp://",
       storeUrl: "https://apps.apple.com/us/app/quantum-leap-2026/id6758663541",
     },
     android: {
-      package: "com.zuddl.quantumleap2026",
-      sha256: "REPLACE_WITH_SHA256_FROM_PLAY_CONSOLE",  // ← optional, needed for App Links
+      package:  "com.zuddl.quantumleap2026",
       storeUrl: "https://play.google.com/store/apps/details?id=com.zuddl.quantumleap2026",
     },
-    fallback: "https://apps.apple.com/us/app/quantum-leap-2026/id6758663541",
   },
 
-  /**
-   * Zuddl Events (Portal)
-   * iOS:     https://apps.apple.com/us/app/zuddl-events/id6450897791
-   * Android: https://play.google.com/store/apps/details?id=com.zuddl.portal
-   *
-   * TODO: Replace TEAMID_ZE with your Apple Team ID
-   * TODO: Replace sha256 with value from Play Console → Setup → App Integrity
-   * TODO: Set scheme to whatever is registered in your app (e.g. "zuddl://")
-   */
-  zuddl: {
-    name: "Zuddl Events",
+  // Package name key → /link/com.zuddl.quantumleap2026/game/eventId/xxx
+  "com.zuddl.quantumleap2026": {
+    name: "Quantum Leap 2026",
+    fallback: "https://play.google.com/store/apps/details?id=com.zuddl.quantumleap2026",
     ios: {
-      appId: "TEAMID_ZE.com.zuddl.portal",             // ← replace TEAMID_ZE
-      scheme: "zuddl://",                               // ← confirm with your iOS dev
+      appId:    "TEAMID_QL.com.zuddl.quantumleap2026",
+      scheme:   "quantumapp://",
+      storeUrl: "https://apps.apple.com/us/app/quantum-leap-2026/id6758663541",
+    },
+    android: {
+      package:  "com.zuddl.quantumleap2026",
+      storeUrl: "https://play.google.com/store/apps/details?id=com.zuddl.quantumleap2026",
+    },
+  },
+
+  // ── Zuddl Events (Portal) ──────────────────────────────────────────────────
+
+  // Short key  → /link/zuddl/game/eventId/xxx
+  "zuddl": {
+    name: "Zuddl Events",
+    fallback: "https://play.google.com/store/apps/details?id=com.zuddl.portal",
+    ios: {
+      appId:    "TEAMID_ZE.com.zuddl.portal",
+      scheme:   "zuddlapp://",
       storeUrl: "https://apps.apple.com/us/app/zuddl-events/id6450897791",
     },
     android: {
-      package: "com.zuddl.portal",
-      sha256: "REPLACE_WITH_SHA256_FROM_PLAY_CONSOLE",  // ← optional, needed for App Links
+      package:  "com.zuddl.portal",
       storeUrl: "https://play.google.com/store/apps/details?id=com.zuddl.portal",
     },
-    fallback: "https://zuddl.com",
+  },
+
+  // Package name key → /link/com.zuddl.portal/game/eventId/xxx
+  "com.zuddl.portal": {
+    name: "Zuddl Events",
+    fallback: "https://play.google.com/store/apps/details?id=com.zuddl.portal",
+    ios: {
+      appId:    "TEAMID_ZE.com.zuddl.portal",
+      scheme:   "zuddlapp://",
+      storeUrl: "https://apps.apple.com/us/app/zuddl-events/id6450897791",
+    },
+    android: {
+      package:  "com.zuddl.portal",
+      storeUrl: "https://play.google.com/store/apps/details?id=com.zuddl.portal",
+    },
   },
 
 };

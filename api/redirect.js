@@ -3,14 +3,15 @@ const apps = require("../config/apps");
 /**
  * Deep Link Redirect Handler
  *
- * Usage:
- *   /redirect?app=app1&path=/product/123&ref=email
- *   /link/app1/product/123?ref=email
+ * Supports:
+ *   /link/:app/:path*
+ *   /redirect?app=zuddl&path=/game/eventId/xxx/qrcode/yyy
  *
- * Query params:
- *   app   - app key from config/apps.js (required)
- *   path  - deep link path inside app (default: "/")
- *   ...   - any extra params are forwarded to the app
+ * Features:
+ *   - Opens app directly if installed
+ *   - Deferred deep linking via Play Store referrer (Android)
+ *   - Deferred deep linking via clipboard (iOS)
+ *   - Auto-redirects to store if app not installed
  */
 module.exports = (req, res) => {
   const { app, path = "/", ...extraParams } = req.query;
@@ -28,15 +29,23 @@ module.exports = (req, res) => {
     });
   }
 
-  // ── Build URLs ────────────────────────────────────────────────────────────
-  const deepPath = path.startsWith("/") ? path : `/${path}`;
+  // ── Build full path ───────────────────────────────────────────────────────
+  const deepPath    = path.startsWith("/") ? path : `/${path}`;
   const queryString = new URLSearchParams(extraParams).toString();
-  const fullPath = queryString ? `${deepPath}?${queryString}` : deepPath;
+  const fullPath    = queryString ? `${deepPath}?${queryString}` : deepPath;
 
-  const iosSchemeUrl   = `${appConfig.ios.scheme}${fullPath.replace(/^\//, "")}`;
-  const androidIntent  = buildAndroidIntent(appConfig, fullPath);
-  const fallbackUrl    = `${appConfig.fallback}${fullPath}`;
-  const iosStoreUrl    = appConfig.ios.storeUrl;
+  // ── Parse deep link segments for deferred linking ─────────────────────────
+  // e.g. /game/eventId/4ad948a6-.../qrcode/EAFPSNAB2I
+  const segments     = deepPath.split("/").filter(Boolean);
+  const deepLinkData = parseSegments(segments);
+
+  // ── Build URLs ────────────────────────────────────────────────────────────
+  const host            = req.headers.host || "deeplinking2.vercel.app";
+  const fullDeepLinkUrl = `https://${host}/link/${app}${deepPath}`;
+  const iosSchemeUrl    = `${appConfig.ios.scheme}${fullPath.replace(/^\//, "")}`;
+  const androidIntent   = buildAndroidIntent(appConfig, fullPath, deepLinkData);
+  const fallbackUrl     = `${appConfig.fallback}${fullPath}`;
+  const iosStoreUrl     = appConfig.ios.storeUrl;
   const androidStoreUrl = appConfig.android.storeUrl;
 
   // ── Detect platform ───────────────────────────────────────────────────────
@@ -46,7 +55,7 @@ module.exports = (req, res) => {
 
   // ── Respond ───────────────────────────────────────────────────────────────
   const html = buildHtml({
-    appName:          appConfig.name,
+    appName: appConfig.name,
     iosSchemeUrl,
     androidIntent,
     fallbackUrl,
@@ -54,6 +63,7 @@ module.exports = (req, res) => {
     androidStoreUrl,
     isIOS,
     isAndroid,
+    fullDeepLinkUrl,
   });
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -63,18 +73,70 @@ module.exports = (req, res) => {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildAndroidIntent(appConfig, fullPath) {
-  // Android Intent URL format for deep linking
+/**
+ * Parse path segments into key-value pairs
+ * Input:  ["game", "eventId", "4ad948a6-...", "qrcode", "EAFPSNAB2I"]
+ * Output: { type: "game", eventId: "4ad948a6-...", qrcode: "EAFPSNAB2I" }
+ */
+function parseSegments(segments) {
+  const data = {};
+  if (segments.length === 0) return data;
+
+  // First segment is the type (game, event, session, speaker)
+  data.type = segments[0];
+
+  // Rest are key-value pairs
+  for (let i = 1; i < segments.length; i += 2) {
+    const key   = segments[i];
+    const value = segments[i + 1];
+    if (key && value) data[key] = value;
+  }
+
+  return data;
+}
+
+/**
+ * Build Android Intent URL with Play Store referrer for deferred deep linking
+ *
+ * When app IS installed     → opens app directly at the deep link path
+ * When app is NOT installed → opens Play Store with referrer params
+ *                             App reads referrer via InstallReferrerClient on first launch
+ *
+ * Referrer example: type=game&eventId=4ad948a6-...&qrcode=EAFPSNAB2I
+ */
+function buildAndroidIntent(appConfig, fullPath, deepLinkData) {
+  const referrerParams = Object.entries(deepLinkData)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join("&");
+
+  const storeUrlWithReferrer = referrerParams
+    ? `${appConfig.android.storeUrl}&referrer=${encodeURIComponent(referrerParams)}`
+    : appConfig.android.storeUrl;
+
   return (
     `intent://${appConfig.fallback.replace(/https?:\/\//, "")}${fullPath}` +
     `#Intent;` +
     `scheme=https;` +
     `package=${appConfig.android.package};` +
-    `S.browser_fallback_url=${encodeURIComponent(appConfig.android.storeUrl)};` +
+    `S.browser_fallback_url=${encodeURIComponent(storeUrlWithReferrer)};` +
     `end`
   );
 }
 
+/**
+ * Build the HTML redirect page
+ *
+ * Android flow:
+ *   1. Tries Intent URL → opens app if installed
+ *   2. Not installed → Play Store opens with referrer (type, eventId, qrcode etc.)
+ *   3. After install, app reads referrer via InstallReferrerClient
+ *
+ * iOS flow:
+ *   1. Tries custom scheme → opens app if installed
+ *   2. Not installed → copies full deep link URL to clipboard
+ *   3. Redirects to App Store after 2s
+ *   4. After install, app reads clipboard on first launch
+ */
 function buildHtml({
   appName,
   iosSchemeUrl,
@@ -84,13 +146,14 @@ function buildHtml({
   androidStoreUrl,
   isIOS,
   isAndroid,
+  fullDeepLinkUrl,
 }) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Opening ${appName}…</title>
+  <title>Opening ${appName}...</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -114,10 +177,9 @@ function buildHtml({
     .btn {
       display: inline-block; width: 100%; padding: 14px;
       border-radius: 12px; font-size: 16px; font-weight: 500;
-      text-decoration: none; cursor: pointer; margin-top: 8px;
-      border: none;
+      text-decoration: none; cursor: pointer; margin-top: 8px; border: none;
     }
-    .btn-primary { background: #007aff; color: white; }
+    .btn-primary   { background: #007aff; color: white; }
     .btn-secondary { background: #f2f2f7; color: #1d1d1f; }
     #status { font-size: 13px; color: #6e6e73; margin-top: 16px; }
   </style>
@@ -126,9 +188,9 @@ function buildHtml({
   <div class="card">
     <div class="spinner" id="spinner"></div>
     <h1>Opening ${appName}</h1>
-    <p id="msg">Redirecting you to the app…</p>
+    <p id="msg">Redirecting you to the app...</p>
 
-    <a id="openBtn" class="btn btn-primary" href="#">Open App</a>
+    <a id="openBtn"  class="btn btn-primary"   href="#">Open App</a>
     <a id="storeBtn" class="btn btn-secondary" href="#" style="display:none">Get the App</a>
     <a id="webBtn"   class="btn btn-secondary" href="${fallbackUrl}" style="display:none">Continue in Browser</a>
 
@@ -136,13 +198,16 @@ function buildHtml({
   </div>
 
 <script>
-  const isIOS     = ${isIOS};
-  const isAndroid = ${isAndroid};
-
+  const isIOS      = ${isIOS};
+  const isAndroid  = ${isAndroid};
   const iosUrl     = ${JSON.stringify(iosSchemeUrl)};
   const androidUrl = ${JSON.stringify(androidIntent)};
   const storeUrl   = isIOS ? ${JSON.stringify(iosStoreUrl)} : ${JSON.stringify(androidStoreUrl)};
   const fallback   = ${JSON.stringify(fallbackUrl)};
+
+  // Full deep link URL — copied to clipboard for iOS deferred deep linking
+  // App reads this from clipboard on first launch after install
+  const deepLinkUrl = ${JSON.stringify(fullDeepLinkUrl)};
 
   const openBtn  = document.getElementById("openBtn");
   const storeBtn = document.getElementById("storeBtn");
@@ -153,17 +218,18 @@ function buildHtml({
 
   const deepLink = isAndroid ? androidUrl : iosUrl;
 
-  openBtn.href = deepLink;
+  openBtn.href  = deepLink;
   storeBtn.href = storeUrl;
 
-  let appOpened = false;
+  let appOpened       = false;
   let visibilityDelay = null;
 
-  // Use visibilitychange ONLY — blur is unreliable on iOS (false positives)
-  // Add a small delay to avoid false positives from Safari's scheme-not-found flicker
+  // ── App open detection ────────────────────────────────────────────────────
+  // Use visibilitychange ONLY — window.blur causes false positives on iOS
+  // when scheme is not registered (Safari flickers briefly)
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
-      // Wait 300ms — if page stays hidden, app really opened
+      // Page hidden = app may have opened, confirm after 300ms
       visibilityDelay = setTimeout(() => { appOpened = true; }, 300);
     } else {
       // Page came back quickly = false positive, cancel
@@ -171,29 +237,73 @@ function buildHtml({
     }
   });
 
-  // Attempt to open the app immediately
+  // ── iOS clipboard helper ──────────────────────────────────────────────────
+  // Copies the full deep link URL to clipboard so the app can read it
+  // on first launch via UIPasteboard (deferred deep linking)
+  function copyDeepLinkToClipboard() {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(deepLinkUrl).catch(() => fallbackCopy());
+      } else {
+        fallbackCopy();
+      }
+    } catch(e) { /* clipboard not available, silently fail */ }
+  }
+
+  function fallbackCopy() {
+    try {
+      const el = document.createElement("textarea");
+      el.value = deepLinkUrl;
+      el.style.cssText = "position:fixed;opacity:0;top:0;left:0;";
+      document.body.appendChild(el);
+      el.focus();
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    } catch(e) {}
+  }
+
+  // ── Step 1: Attempt to open app immediately ───────────────────────────────
   window.location.href = deepLink;
 
-  // After 3s, check if app opened
+  // ── Step 2: After 3s, check result ───────────────────────────────────────
   setTimeout(() => {
     if (!appOpened) {
-      spinner.style.display = "none";
-      msg.textContent = "Couldn't open the app automatically.";
-      openBtn.textContent = "Try Opening App";
+
+      // App is NOT installed
+      spinner.style.display  = "none";
+      msg.textContent        = "Couldn't open the app automatically.";
+      openBtn.textContent    = "Try Opening App";
       storeBtn.style.display = "block";
       webBtn.style.display   = "block";
 
-      // iOS: auto-redirect to App Store
       if (isIOS) {
+        // ── iOS Deferred Deep Linking ───────────────────────────────────────
+        // 1. Copy deep link URL to clipboard
+        // 2. App reads clipboard on first launch → navigates to correct screen
+        copyDeepLinkToClipboard();
+
         status.textContent = "Redirecting to App Store in 2 seconds...";
+
+        // Auto redirect to App Store
         setTimeout(() => {
           if (!appOpened) window.location.href = storeUrl;
         }, 2000);
-      } else {
+
+      } else if (isAndroid) {
+        // ── Android Deferred Deep Linking ──────────────────────────────────
+        // Referrer params already embedded in Intent URL fallback_url
+        // Play Store passes them to app → app reads via InstallReferrerClient
+        // e.g. type=game&eventId=4ad948a6-...&qrcode=EAFPSNAB2I
         status.textContent = "App not installed? Download it from the store.";
+
+      } else {
+        status.textContent = "Please open this link on your mobile device.";
       }
+
     } else {
-      msg.textContent = "App opened successfully!";
+      // App IS installed — opened successfully
+      msg.textContent       = "App opened successfully!";
       spinner.style.display = "none";
     }
   }, 3000);

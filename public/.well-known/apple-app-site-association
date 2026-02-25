@@ -6,22 +6,18 @@
         "appID": "TEAMID_QL.com.zuddl.quantumleap2026",
         "paths": [
           "/link/quantumleap/*",
-          "/redirect?app=quantumleap*"
+          "/link/com.zuddl.quantumleap2026/*",
+          "/redirect*"
         ]
       },
       {
         "appID": "TEAMID_ZE.com.zuddl.portal",
         "paths": [
           "/link/zuddl/*",
-          "/redirect?app=zuddl*"
+          "/link/com.zuddl.portal/*",
+          "/redirect*"
         ]
       }
-    ]
-  },
-  "webcredentials": {
-    "apps": [
-      "TEAMID_QL.com.zuddl.quantumleap2026",
-      "TEAMID_ZE.com.zuddl.portal"
     ]
   }
 }

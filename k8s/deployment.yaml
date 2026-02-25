@@ -15,6 +15,7 @@ spec:
       containers:
         - name: deeplink-server
           image: current-image-name
+          imagePullPolicy: Always
           ports:
             - containerPort: 3000
           resources:

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: deeplink-service
+spec:
+  selector:
+    app: deeplink-server
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: ClusterIP

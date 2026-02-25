@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "com.zuddl.quantumleap2026",
       "sha256_cert_fingerprints": [
-        "F4:3B:B4:2A:5D:9D:65:1C:BF:5B:1B:B1:DF:4A:98:E5:7D:DE:6D:7D:B7:23:39:C8:3F:41:ED:44:F9:59:D3:B1"
+        "F4:3B:B4:2A:5D:9D:65:1C:BF:5B:1B:B1:DF:4A:98:E5:7D:DE:6D:7D:B7:23:39:C8:3F:41:ED:44:F9:59:D3:B1",
+        "23:8E:6C:9B:F4:AA:CE:2B:70:DF:3B:D7:11:CD:A8:BE:F4:B9:96:14:57:18:07:1F:07:46:15:D7:B0:35:97:6D"
       ]
     }
   },
@@ -15,7 +16,8 @@
       "namespace": "android_app",
       "package_name": "com.zuddl.portal",
       "sha256_cert_fingerprints": [
-        "F4:3B:B4:2A:5D:9D:65:1C:BF:5B:1B:B1:DF:4A:98:E5:7D:DE:6D:7D:B7:23:39:C8:3F:41:ED:44:F9:59:D3:B1"
+        "F4:3B:B4:2A:5D:9D:65:1C:BF:5B:1B:B1:DF:4A:98:E5:7D:DE:6D:7D:B7:23:39:C8:3F:41:ED:44:F9:59:D3:B1",
+        "78:90:27:DB:24:9C:62:82:16:BE:2F:02:D1:06:7D:18:6C:80:73:11:D1:11:E7:BE:57:D4:60:CF:B0:79:DF:62"
       ]
     }
   }

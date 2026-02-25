@@ -3,7 +3,7 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAMID_QL.com.zuddl.quantumleap2026",
+        "appID": "N5U57VS25Y.com.zuddl.quantumleap2026",
         "paths": [
           "/link/quantumleap/*",
           "/link/com.zuddl.quantumleap2026/*",
@@ -11,7 +11,7 @@
         ]
       },
       {
-        "appID": "TEAMID_ZE.com.zuddl.portal",
+        "appID": "N5U57VS25Y.com.zuddl.portal",
         "paths": [
           "/link/zuddl/*",
           "/link/com.zuddl.portal/*",

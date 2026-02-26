@@ -9,7 +9,7 @@ on:
       - prod
 
 concurrency:
-  group: build-k8s-${{ github.ref }}
+  group: build-k8s-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
       AWS_REGION: "${{ secrets.AWS_REGION }}"
       DOCKER_REGISTRY: "${{ secrets.DOCKER_REGISTRY }}"
       EKS_CLUSTER_NAME: "${{ secrets.EKS_CLUSTER_NAME }}"
-      IMAGE_TAG: "${{ github.ref }}-${{ github.run_number }}-${{ github.run_attempt }}"
+      IMAGE_TAG: "${{ github.ref_name }}-${{ github.run_number }}-${{ github.run_attempt }}"
     steps:
       - name: twingate-pre-setup
         run: |
@@ -83,7 +83,7 @@ jobs:
         env:
           DEEPLINK_HOST: ${{ secrets.DEEPLINK_HOST }}
         run: |
-          if [[ "${{ github.ref_name }}" == "prod" ]]; then
+          if [[ "${{ github.ref_name_name }}" == "prod" ]]; then
             NAME_SPACE=prod
           else
             NAME_SPACE=staging

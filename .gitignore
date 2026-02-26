@@ -1,0 +1,18 @@
+.idea/
+.vscode/
+.DS_Store
+node_modules/
+
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Common credential/key artifacts
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+*.mobileprovision
+*.p8

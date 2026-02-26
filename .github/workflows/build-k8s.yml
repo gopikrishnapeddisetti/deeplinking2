@@ -15,6 +15,8 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: blacksmith-2vcpu-ubuntu-2404
+    environment:
+      name: ${{ github.ref_name }}
     env:
       APP_NAME: deeplink-server
       AWS_REGION: "${{ secrets.AWS_REGION }}"
@@ -33,17 +35,32 @@ jobs:
         env:
           TWINGATE_SERVICE_KEY: ${{ secrets.TWINGATE_SERVICE_KEY }}
         run: |
+          # Validate secret is not empty
+          if [[ -z "$TWINGATE_SERVICE_KEY" ]]; then
+            echo "::error::TWINGATE_SERVICE_KEY secret is empty or not set"
+            exit 1
+          fi
+
           echo "$TWINGATE_SERVICE_KEY" | base64 -d | sudo twingate setup --headless -
           sudo twingate start
-          for i in {1..15}; do
+
+          ONLINE=false
+          for i in {1..30}; do
             STATUS=$(twingate status 2>&1 || true)
+            echo "[$i/30] Twingate status: $STATUS"
             if echo "$STATUS" | grep -qi "online"; then
               echo "Twingate is online"
+              ONLINE=true
               break
             fi
-            echo "Waiting for Twingate... ($i/15)"
             sleep 3
           done
+
+          if [[ "$ONLINE" != "true" ]]; then
+            echo "::error::Twingate failed to come online after 90 seconds. Last status: $STATUS"
+            sudo twingate logs 2>&1 | tail -50 || true
+            exit 1
+          fi
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,7 +100,7 @@ jobs:
         env:
           DEEPLINK_HOST: ${{ secrets.DEEPLINK_HOST }}
         run: |
-          if [[ "${{ github.ref_name_name }}" == "prod" ]]; then
+          if [[ "${{ github.ref_name }}" == "prod" ]]; then
             NAME_SPACE=prod
           else
             NAME_SPACE=staging

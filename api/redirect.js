@@ -3,15 +3,18 @@ const apps = require("../config/apps");
 /**
  * Deep Link Redirect Handler
  *
- * Supports:
- *   /link/:app/:path*
- *   /redirect?app=zuddl&path=/game/eventId/xxx/qrcode/yyy
+ * URL Pattern:
+ *   /link/{appId}/{eventId}/{type}/{qrCode}
  *
- * Features:
- *   - Opens app directly if installed
- *   - Deferred deep linking via Play Store referrer (Android)
- *   - Deferred deep linking via clipboard (iOS)
- *   - Auto-redirects to store if app not installed
+ * Example:
+ *   /link/com.zuddl.quantumleap2026/4ad948a6-5171-4446-9795-bd6386baa0f6/game/EAFPSNAB2I
+ *
+ * Segments:
+ *   [0] = "link"
+ *   [1] = appId    → "com.zuddl.quantumleap2026" or "com.zuddl.portal"
+ *   [2] = eventId  → "4ad948a6-5171-4446-9795-bd6386baa0f6"
+ *   [3] = type     → "game", "event", "session", "speaker"
+ *   [4] = qrCode   → "EAFPSNAB2I" (optional)
  */
 module.exports = (req, res) => {
   const { app, path = "/", ...extraParams } = req.query;
@@ -34,13 +37,14 @@ module.exports = (req, res) => {
   const queryString = new URLSearchParams(extraParams).toString();
   const fullPath    = queryString ? `${deepPath}?${queryString}` : deepPath;
 
-  // ── Parse deep link segments for deferred linking ─────────────────────────
-  // e.g. /game/eventId/4ad948a6-.../qrcode/EAFPSNAB2I
+  // ── Parse new URL pattern for deferred deep linking ───────────────────────
+  // deepPath = /{eventId}/{type}/{qrCode}
+  // e.g.     = /4ad948a6-.../game/EAFPSNAB2I
   const segments     = deepPath.split("/").filter(Boolean);
-  const deepLinkData = parseSegments(segments);
+  const deepLinkData = parseSegments(segments, app);
 
   // ── Build URLs ────────────────────────────────────────────────────────────
-  const host            = req.headers.host || "deeplinking2.vercel.app";
+  const host            = req.headers.host || "applink.zuddl.com";
   const fullDeepLinkUrl = `https://${host}/link/${app}${deepPath}`;
   const iosSchemeUrl    = `${appConfig.ios.scheme}${fullPath.replace(/^\//, "")}`;
   const androidIntent   = buildAndroidIntent(appConfig, fullPath, deepLinkData);
@@ -74,38 +78,42 @@ module.exports = (req, res) => {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Parse path segments into key-value pairs
- * Input:  ["game", "eventId", "4ad948a6-...", "qrcode", "EAFPSNAB2I"]
- * Output: { type: "game", eventId: "4ad948a6-...", qrcode: "EAFPSNAB2I" }
+ * Parse new URL pattern segments
+ *
+ * New pattern: /link/{appId}/{eventId}/{type}/{qrCode}
+ * deepPath segments (after splitting /link/{appId}):
+ *   [0] = eventId  → "4ad948a6-5171-4446-9795-bd6386baa0f6"
+ *   [1] = type     → "game"
+ *   [2] = qrCode   → "EAFPSNAB2I" (optional)
+ *
+ * Returns flat object for Play Store referrer:
+ *   { appId, eventId, type, qrCode }
  */
-function parseSegments(segments) {
-  const data = {};
-  if (segments.length === 0) return data;
+function parseSegments(segments, appId) {
+  const data = { appId };
 
-  // First segment is the type (game, event, session, speaker)
-  data.type = segments[0];
-
-  // Rest are key-value pairs
-  for (let i = 1; i < segments.length; i += 2) {
-    const key   = segments[i];
-    const value = segments[i + 1];
-    if (key && value) data[key] = value;
-  }
+  // segments = ["eventId-uuid", "game", "EAFPSNAB2I"]
+  if (segments[0]) data.eventId = segments[0];  // 4ad948a6-...
+  if (segments[1]) data.type    = segments[1];  // game
+  if (segments[2]) data.qrCode  = segments[2];  // EAFPSNAB2I
 
   return data;
 }
 
 /**
- * Build Android Intent URL with Play Store referrer for deferred deep linking
+ * Build Android Intent URL
  *
- * When app IS installed     → opens app directly at the deep link path
- * When app is NOT installed → opens Play Store with referrer params
- *                             App reads referrer via InstallReferrerClient on first launch
+ * App installed     → opens DeepLinkActivity directly
+ * App not installed → Play Store opens with referrer:
+ *                     appId=com.zuddl.quantumleap2026&eventId=4ad948a6-...&type=game&qrCode=EAFPSNAB2I
  *
- * Referrer example: type=game&eventId=4ad948a6-...&qrcode=EAFPSNAB2I
+ * Android reads referrer via InstallReferrerClient on first launch
  */
 function buildAndroidIntent(appConfig, fullPath, deepLinkData) {
+  // Build referrer from parsed data
+  // e.g. appId=com.zuddl.quantumleap2026&eventId=4ad948a6-...&type=game&qrCode=EAFPSNAB2I
   const referrerParams = Object.entries(deepLinkData)
+    .filter(([, v]) => v !== undefined)
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join("&");
 
@@ -124,18 +132,18 @@ function buildAndroidIntent(appConfig, fullPath, deepLinkData) {
 }
 
 /**
- * Build the HTML redirect page
+ * Build HTML redirect page
  *
  * Android flow:
- *   1. Tries Intent URL → opens app if installed
- *   2. Not installed → Play Store opens with referrer (type, eventId, qrcode etc.)
- *   3. After install, app reads referrer via InstallReferrerClient
+ *   App installed     → Intent URL opens DeepLinkActivity
+ *   App not installed → Play Store with referrer params
+ *                     → InstallReferrerClient reads: appId, eventId, type, qrCode
  *
  * iOS flow:
- *   1. Tries custom scheme → opens app if installed
- *   2. Not installed → copies full deep link URL to clipboard
- *   3. Redirects to App Store after 2s
- *   4. After install, app reads clipboard on first launch
+ *   App installed     → Universal Link opens app via onOpenURL
+ *   App not installed → Copies full URL to clipboard
+ *                     → Redirects to App Store after 2s
+ *                     → App reads clipboard on first launch
  */
 function buildHtml({
   appName,
@@ -205,8 +213,9 @@ function buildHtml({
   const storeUrl   = isIOS ? ${JSON.stringify(iosStoreUrl)} : ${JSON.stringify(androidStoreUrl)};
   const fallback   = ${JSON.stringify(fallbackUrl)};
 
-  // Full deep link URL — copied to clipboard for iOS deferred deep linking
-  // App reads this from clipboard on first launch after install
+  // Full URL stored in clipboard for iOS deferred deep linking
+  // Pattern: https://applink.zuddl.com/link/{appId}/{eventId}/{type}/{qrCode}
+  // App reads this from UIPasteboard on first launch → navigates to correct screen
   const deepLinkUrl = ${JSON.stringify(fullDeepLinkUrl)};
 
   const openBtn  = document.getElementById("openBtn");
@@ -225,21 +234,15 @@ function buildHtml({
   let visibilityDelay = null;
 
   // ── App open detection ────────────────────────────────────────────────────
-  // Use visibilitychange ONLY — window.blur causes false positives on iOS
-  // when scheme is not registered (Safari flickers briefly)
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
-      // Page hidden = app may have opened, confirm after 300ms
       visibilityDelay = setTimeout(() => { appOpened = true; }, 300);
     } else {
-      // Page came back quickly = false positive, cancel
       if (visibilityDelay) clearTimeout(visibilityDelay);
     }
   });
 
-  // ── iOS clipboard helper ──────────────────────────────────────────────────
-  // Copies the full deep link URL to clipboard so the app can read it
-  // on first launch via UIPasteboard (deferred deep linking)
+  // ── iOS clipboard for deferred deep linking ───────────────────────────────
   function copyDeepLinkToClipboard() {
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -247,7 +250,7 @@ function buildHtml({
       } else {
         fallbackCopy();
       }
-    } catch(e) { /* clipboard not available, silently fail */ }
+    } catch(e) {}
   }
 
   function fallbackCopy() {
@@ -263,14 +266,13 @@ function buildHtml({
     } catch(e) {}
   }
 
-  // ── Step 1: Attempt to open app immediately ───────────────────────────────
+  // ── Step 1: Try to open app ───────────────────────────────────────────────
   window.location.href = deepLink;
 
-  // ── Step 2: After 3s, check result ───────────────────────────────────────
+  // ── Step 2: After 3s check if app opened ─────────────────────────────────
   setTimeout(() => {
     if (!appOpened) {
 
-      // App is NOT installed
       spinner.style.display  = "none";
       msg.textContent        = "Couldn't open the app automatically.";
       openBtn.textContent    = "Try Opening App";
@@ -278,23 +280,19 @@ function buildHtml({
       webBtn.style.display   = "block";
 
       if (isIOS) {
-        // ── iOS Deferred Deep Linking ───────────────────────────────────────
-        // 1. Copy deep link URL to clipboard
-        // 2. App reads clipboard on first launch → navigates to correct screen
+        // Copy full URL to clipboard
+        // App reads on first launch via UIPasteboard
+        // Parses: /link/{appId}/{eventId}/{type}/{qrCode}
         copyDeepLinkToClipboard();
-
         status.textContent = "Redirecting to App Store in 2 seconds...";
-
-        // Auto redirect to App Store
         setTimeout(() => {
           if (!appOpened) window.location.href = storeUrl;
         }, 2000);
 
       } else if (isAndroid) {
-        // ── Android Deferred Deep Linking ──────────────────────────────────
-        // Referrer params already embedded in Intent URL fallback_url
-        // Play Store passes them to app → app reads via InstallReferrerClient
-        // e.g. type=game&eventId=4ad948a6-...&qrcode=EAFPSNAB2I
+        // Referrer already in Intent URL fallback
+        // Play Store passes to app on install
+        // InstallReferrerClient reads: appId, eventId, type, qrCode
         status.textContent = "App not installed? Download it from the store.";
 
       } else {
@@ -302,7 +300,6 @@ function buildHtml({
       }
 
     } else {
-      // App IS installed — opened successfully
       msg.textContent       = "App opened successfully!";
       spinner.style.display = "none";
     }
